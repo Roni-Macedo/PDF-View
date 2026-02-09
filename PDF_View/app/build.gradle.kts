@@ -52,6 +52,7 @@ dependencies {
     implementation(libs.androidx.compose.material3)
 
     implementation("com.github.pratikksahu:JetPDFVue:1.0.7")
+    implementation(libs.androidx.compose.foundation.layout)
 
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)

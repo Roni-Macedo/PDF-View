@@ -1,13 +1,14 @@
 package com.example.pdfview
 
-import android.app.Activity
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.pdf.PdfRenderer
+import android.net.Uri
 import android.os.Bundle
 import android.os.ParcelFileDescriptor
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
 import androidx.annotation.RawRes
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -28,7 +29,6 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
@@ -42,13 +42,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.dp
 import androidx.core.graphics.createBitmap
-import androidx.core.view.WindowCompat
-import androidx.core.view.WindowInsetsCompat
-import androidx.core.view.WindowInsetsControllerCompat
-import com.example.pdfview.ui.theme.PDFViewTheme
+import com.example.pdfview.ui.components.VerticalScrollbar
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -56,33 +52,21 @@ import java.io.File
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        enableEdgeToEdge()
+
+        val pdfUri = intent?.data
+
         setContent {
-            PDFViewTheme {
+
+            if (pdfUri != null) {
+                PdfFromUriScreen(pdfUri)
+            } else {
                 PdfFromRawScreen()
-                HideSystemBars()
             }
         }
     }
 }
 
-@Composable
-fun HideSystemBars() {
-    val view = LocalView.current
-
-    DisposableEffect(Unit) {
-        val window = (view.context as Activity).window
-        val controller = WindowCompat.getInsetsController(window, view)
-
-        controller.systemBarsBehavior =
-            WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
-
-        controller.hide(WindowInsetsCompat.Type.systemBars())
-
-        onDispose {
-            controller.show(WindowInsetsCompat.Type.systemBars())
-        }
-    }
-}
 
 fun copyPdfFromRawToCache(
     context: Context,
@@ -97,6 +81,47 @@ fun copyPdfFromRawToCache(
         }
     }
     return file
+}
+
+fun copyPdfFromUriToCache(
+    context: Context,
+    uri: Uri,
+    fileName: String = "external.pdf"
+): File {
+    val file = File(context.cacheDir, fileName)
+
+    context.contentResolver.openInputStream(uri)?.use { input ->
+        file.outputStream().use { output ->
+            input.copyTo(output)
+        }
+    }
+
+    return file
+}
+
+@Composable
+fun PdfFromUriScreen(uri: Uri) {
+    val context = LocalContext.current
+
+    val pdfFile = remember(uri) {
+        copyPdfFromUriToCache(context, uri)
+    }
+
+    SimplePdfViewer(file = pdfFile)
+}
+
+fun LazyListState.mostVisibleItemIndex(): Int {
+    val layoutInfo = layoutInfo
+    if (layoutInfo.visibleItemsInfo.isEmpty()) return 0
+
+    return layoutInfo.visibleItemsInfo.maxBy { item ->
+        val start = maxOf(item.offset, 0)
+        val end = minOf(
+            item.offset + item.size,
+            layoutInfo.viewportEndOffset
+        )
+        end - start
+    }.index
 }
 
 @Composable
@@ -115,29 +140,26 @@ fun PdfFromRawScreen(
     SimplePdfViewer(file = pdfFile)
 }
 
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SimplePdfViewer(file: File) {
-
     var pageCount by remember { mutableIntStateOf(0) }
-
-    val bitmapCache = remember {
-        mutableStateMapOf<Int, Bitmap>()
-    }
-
+    val bitmapCache = remember { mutableStateMapOf<Int, Bitmap>() }
     val listState = rememberLazyListState()
+
     val currentPage by remember {
         derivedStateOf {
             when {
                 pageCount == 0 -> 0
+
+                // 🔥 ESSA LINHA RESOLVE O 4/5
                 !listState.canScrollForward -> pageCount
+
                 else -> listState.mostVisibleItemIndex() + 1
             }
         }
     }
 
-    // 📄 Total de páginas
     LaunchedEffect(file) {
         withContext(Dispatchers.IO) {
             val fd = ParcelFileDescriptor.open(file, ParcelFileDescriptor.MODE_READ_ONLY)
@@ -152,117 +174,88 @@ fun SimplePdfViewer(file: File) {
         topBar = {
             TopAppBar(
                 title = {
-                    Text(
-                        text = if (pageCount > 0)
-                            "Página $currentPage / $pageCount"
-                        else
-                            "PDF"
-                    )
+                    Text(text = if (pageCount > 0) "Página $currentPage / $pageCount" else "PDF")
                 }
             )
         }
     ) { paddingValues ->
 
-        if (pageCount == 0) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(paddingValues),
-                contentAlignment = Alignment.Center
-            ) {
-                CircularProgressIndicator()
-            }
-            return@Scaffold
-        }
-
-        LazyColumn(
-            state = listState,
+        // --- SOLUÇÃO: Usamos um Box para colocar o Contador SOBRE a lista ---
+        Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(Color.LightGray)
                 .padding(paddingValues)
         ) {
-            items(
-                count = pageCount,
-                key = { it }
-            ) { pageIndex ->
 
-                val bitmap = bitmapCache[pageIndex]
-
-                LaunchedEffect(bitmap) {
-                    if (bitmap == null) {
-                        withContext(Dispatchers.IO) {
-                            val fd = ParcelFileDescriptor.open(
-                                file,
-                                ParcelFileDescriptor.MODE_READ_ONLY
-                            )
-                            val renderer = PdfRenderer(fd)
-
-                            val page = renderer.openPage(pageIndex)
-
-                            val bmp = createBitmap(page.width, page.height)
-
-                            page.render(
-                                bmp,
-                                null,
-                                null,
-                                PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY
-                            )
-
-                            page.close()
-                            renderer.close()
-                            fd.close()
-
-                            bitmapCache[pageIndex] = bmp
+            LazyColumn(
+                state = listState,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.LightGray),
+            ) {
+                items(count = pageCount, key = { it }) { pageIndex ->
+                    val bitmap = bitmapCache[pageIndex]
+                    LaunchedEffect(pageIndex) {
+                        if (bitmap == null) {
+                            withContext(Dispatchers.IO) {
+                                val fd = ParcelFileDescriptor.open(
+                                    file,
+                                    ParcelFileDescriptor.MODE_READ_ONLY
+                                )
+                                val renderer = PdfRenderer(fd)
+                                val page = renderer.openPage(pageIndex)
+                                val bmp = createBitmap(page.width, page.height)
+                                page.render(
+                                    bmp,
+                                    null,
+                                    null,
+                                    PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY
+                                )
+                                page.close()
+                                renderer.close()
+                                fd.close()
+                                bitmapCache[pageIndex] = bmp
+                            }
                         }
                     }
-                }
 
-                Card(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 12.dp, vertical = 8.dp),
-                    shape = RoundedCornerShape(12.dp),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
-                    colors = CardDefaults.cardColors(
-                        containerColor = Color.White
-                    )
-                ) {
-                    if (bitmap != null) {
-                        Image(
-                            bitmap = bitmap.asImageBitmap(),
-                            contentDescription = "Página ${pageIndex + 1}",
-                            modifier = Modifier.fillMaxWidth(),
-                            contentScale = ContentScale.Crop
-                        )
-                    } else {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(200.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            CircularProgressIndicator()
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 12.dp, vertical = 8.dp),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = CardDefaults.cardColors(containerColor = Color.White)
+                    ) {
+                        if (bitmap != null) {
+                            Image(
+                                bitmap = bitmap.asImageBitmap(),
+                                contentDescription = null,
+                                modifier = Modifier.fillMaxWidth(),
+                                contentScale = ContentScale.FillWidth // Ajustado para preencher largura
+                            )
+                        } else {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(200.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                CircularProgressIndicator()
+                            }
                         }
                     }
+
                 }
+
             }
-
-
+            VerticalScrollbar(
+                listState = listState,
+                modifier = Modifier
+                    .align(Alignment.CenterEnd)
+                    .padding(end = 6.dp),
+                currentPage = currentPage,
+                pageCount = pageCount
+            )
         }
     }
-}
-
-fun LazyListState.mostVisibleItemIndex(): Int {
-    val layoutInfo = layoutInfo
-    if (layoutInfo.visibleItemsInfo.isEmpty()) return 0
-
-    return layoutInfo.visibleItemsInfo.maxBy { item ->
-        val start = maxOf(item.offset, 0)
-        val end = minOf(
-            item.offset + item.size,
-            layoutInfo.viewportEndOffset
-        )
-        end - start
-    }.index
 }
