@@ -1,5 +1,6 @@
 package com.example.pdfview.ui.components
 
+import android.util.Log
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
@@ -11,6 +12,7 @@ import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -52,6 +54,18 @@ fun VerticalScrollbar(
     val dotWidth = 64.dp
     val dotHeight = 34.dp
     val dotSizePx = with(LocalDensity.current) { dotSize.toPx() }
+
+    LaunchedEffect(listState.firstVisibleItemIndex) {
+        val runtime = Runtime.getRuntime()
+        val usedMB =
+            (runtime.totalMemory() - runtime.freeMemory()) / 1024 / 1024
+
+        Log.d(
+            "APP_MEMORY",
+            "Scroll → página visível: ${listState.firstVisibleItemIndex + 1} | " +
+                    "Memória: $usedMB MB"
+        )
+    }
 
     Box(
         modifier = modifier
