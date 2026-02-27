@@ -1,4 +1,4 @@
-package com.example.pdfview.ui.components
+package com.example.pdfview.pdf
 
 import android.content.Context
 import android.graphics.Bitmap
@@ -6,11 +6,11 @@ import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.pdf.PdfRenderer
 import android.net.Uri
+import androidx.core.graphics.createBitmap
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.withContext
-import androidx.core.graphics.createBitmap
 
 class PdfBitmapConverter(
     private val context: Context,
