@@ -8,8 +8,6 @@ import android.graphics.pdf.PdfRenderer
 import android.net.Uri
 import androidx.core.graphics.createBitmap
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.async
-import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.withContext
 
 class PdfBitmapConverter(
@@ -19,33 +17,22 @@ class PdfBitmapConverter(
 
     suspend fun pdfToBitmaps(contentUri: Uri): List<Bitmap> {
         return withContext(Dispatchers.IO) {
-            // Fecha o renderer anterior se existir para evitar vazamento de memória
-            renderer?.close()
-
             try {
-                val pfd = context.contentResolver.openFileDescriptor(contentUri, "r")
-                if (pfd != null) {
-                    val currentRenderer = PdfRenderer(pfd)
-                    renderer = currentRenderer
-
-                    // Usamos async para processar as páginas em paralelo (mais rápido)
-                    val bitmaps = (0 until currentRenderer.pageCount).map { index ->
-                        async {
-                            renderPageToBitmap(currentRenderer, index)
+                // 1. Abrimos o descritor de arquivo
+                context.contentResolver.openFileDescriptor(contentUri, "r")?.use { pfd ->
+                    // 2. Criamos o renderer (o .use garante que ele será fechado ao fim)
+                    PdfRenderer(pfd).use { renderer ->
+                        // 3. Mapeamos as páginas de forma SEQUENCIAL (sem async)
+                        // O renderer NÃO aceita chamadas paralelas
+                        (0 until renderer.pageCount).map { index ->
+                            renderPageToBitmap(renderer, index)
                         }
-                    }.awaitAll()
-
-                    // Importante: pfd e renderer devem ser fechados depois, ou mantidos
-                    // conforme a necessidade. Aqui fechamos para liberar recursos.
-                    currentRenderer.close()
-                    pfd.close()
-
-                    return@withContext bitmaps
-                }
+                    }
+                } ?: emptyList()
             } catch (e: Exception) {
                 e.printStackTrace()
+                emptyList()
             }
-            return@withContext emptyList()
         }
     }
 

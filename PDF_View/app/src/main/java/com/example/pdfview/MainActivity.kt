@@ -13,6 +13,7 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.ui.Modifier
 import com.example.pdfview.pdf.getPdfName
 import com.example.pdfview.ui.screens.PdfViewerScreen
+import com.example.pdfview.ui.theme.PDFViewTheme
 
 
 class MainActivity : ComponentActivity() {
@@ -26,10 +27,11 @@ class MainActivity : ComponentActivity() {
         val pdfName = getPdfName(this, pdfUri)
 
         setContent {
-            PdfViewerScreen(
-                initialPdfUri = pdfUri
-            )
-
+            PDFViewTheme() {
+                PdfViewerScreen(
+                    initialPdfUri = pdfUri
+                )
+            }
         }
     }
 }

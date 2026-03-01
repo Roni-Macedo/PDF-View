@@ -5,6 +5,7 @@ import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.aspectRatio
@@ -13,18 +14,26 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.TopAppBarDefaults.topAppBarColors
 import androidx.compose.material3.TopAppBarScrollBehavior
 import androidx.compose.runtime.*
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
@@ -53,9 +62,7 @@ fun PdfViewerScreen(
     LaunchedEffect(selectedUri) {
         selectedUri?.let { uri ->
             isLoading = true
-
             pdfName = getPdfName(context, uri)
-
             renderedPages = pdfBitmapConverter.pdfToBitmaps(uri)
             isLoading = false
         }
@@ -64,7 +71,6 @@ fun PdfViewerScreen(
     val choosePdfLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
     ) { uri ->
-        // Quando o usuário escolhe o arquivo, o LaunchedEffect acima é disparado automaticamente
         selectedUri = uri
     }
 
@@ -72,13 +78,26 @@ fun PdfViewerScreen(
         modifier = modifier.fillMaxSize(),
         topBar = {
             TopAppBar(
+                colors = topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.primary,
+                ),
                 title = {
                     Text(
                         text = pdfName ?: " PDF Viewer",
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
-                }
+                },
+                navigationIcon = {
+                    if (selectedUri != null) {
+                        IconButton(onClick = { choosePdfLauncher.launch("application/pdf") }) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                contentDescription = "Localized description"
+                            )
+                        }
+                    }
+                },
             )
         }
 
@@ -87,7 +106,7 @@ fun PdfViewerScreen(
         if (selectedUri == null) {
             Box(modifier = modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 Button(onClick = { choosePdfLauncher.launch("application/pdf") }) {
-                    Text(text = "Escolha um PDF")
+                    Text(text = "Escolha um PDF", color = Color.Black)
                 }
             }
         } else if (isLoading) {
@@ -105,15 +124,14 @@ fun PdfViewerScreen(
                 LazyColumn(
                     modifier = modifier
                         .weight(1f)
+                        .background(MaterialTheme.colorScheme.secondary)
                         .fillMaxWidth()
                 ) {
                     items(renderedPages) { page ->
                         PdfPage(page = page, modifier = Modifier.padding(8.dp))
                     }
                 }
-
             }
-
         }
     }
 }
