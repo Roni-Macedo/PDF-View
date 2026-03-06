@@ -50,9 +50,9 @@ dependencies {
     implementation(libs.androidx.compose.ui.graphics)
     implementation(libs.androidx.compose.ui.tooling.preview)
     implementation(libs.androidx.compose.material3)
-
-    implementation("com.github.pratikksahu:JetPDFVue:1.0.7")
     implementation(libs.androidx.compose.foundation.layout)
+
+    implementation("com.github.mhiew:android-pdf-viewer:3.2.0-beta.3")
 
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
