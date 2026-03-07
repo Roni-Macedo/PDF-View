@@ -36,9 +36,9 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.viewinterop.AndroidView
+import com.example.pdfview.pdf.MyScrollHandle
 import com.example.pdfview.ui.theme.PDFViewTheme
 import com.github.barteksc.pdfviewer.PDFView
-import com.github.barteksc.pdfviewer.scroll.DefaultScrollHandle
 
 
 class MainActivity : ComponentActivity() {
@@ -200,10 +200,4 @@ fun getPdfName(context: Context, uri: Uri): String {
     }
 
     return name
-}
-
-class MyScrollHandle(context: Context?) : DefaultScrollHandle(context) {
-    init {
-        setBackgroundColor(Color.Red.toArgb()) // cor da barra
-    }
 }
